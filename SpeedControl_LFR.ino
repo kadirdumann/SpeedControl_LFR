@@ -1,4 +1,4 @@
-//Kadir Branch
+//Merve Branch
 
 #include <AFMotor.h>
 #include <QTRSensors.h>
@@ -58,26 +58,26 @@ void loop() {
 
   hizAyari();
 
-  
+  if(leftMotorSpeed != 0 && rightMotorSpeed != 0 && speedDifference != 0 ){ 
     if(position <= 2500){
       if(position > 1750){
-        motor1.setSpeed(leftMotorSpeed);
+        motor1.setSpeed(speedDifference);
         motor1.run(FORWARD);
-        motor2.setSpeed(rightMotorSpeed);
+        motor2.setSpeed(speedDifference);
         motor2.run(FORWARD);
-        motor3.setSpeed(leftMotorSpeed);
+        motor3.setSpeed(speedDifference);
         motor3.run(FORWARD);
-        motor4.setSpeed(rightMotorSpeed);
+        motor4.setSpeed(speedDifference);
         motor4.run(FORWARD);
       }
       else if(position > 1000){
         motor1.setSpeed(leftMotorSpeed);
         motor1.run(FORWARD);
-        motor2.setSpeed(rightMotorSpeed);
+        motor2.setSpeed(speedDifference);
         motor2.run(BACKWARD);
         motor3.setSpeed(leftMotorSpeed);
         motor3.run(FORWARD);
-        motor4.setSpeed(rightMotorSpeed);
+        motor4.setSpeed(speedDifference);
         motor4.run(BACKWARD);
         Serial.println("SAĞA DÖNÜYOR");
       }
@@ -94,27 +94,28 @@ void loop() {
     }
     else if(position <= 5100){
       if(position > 4500){
-        motor1.setSpeed(leftMotorSpeed);
+        motor1.setSpeed(speedDifference);
         motor1.run(BACKWARD);
         motor2.setSpeed(rightMotorSpeed);
         motor2.run(FORWARD);
-        motor3.setSpeed(leftMotorSpeed);
+        motor3.setSpeed(speedDifference);
         motor3.run(BACKWARD);
         motor4.setSpeed(rightMotorSpeed);
         motor4.run(FORWARD);
         Serial.println("SOLA DÖNÜYOR");
       }
       else if(position > 4000){
-        motor1.setSpeed(leftMotorSpeed);
+        motor1.setSpeed(speedDifference);
         motor1.run(FORWARD);
-        motor2.setSpeed(rightMotorSpeed);
+        motor2.setSpeed(speedDifference);
         motor2.run(FORWARD);
-        motor3.setSpeed(leftMotorSpeed);
+        motor3.setSpeed(speedDifference);
         motor3.run(FORWARD);
-        motor4.setSpeed(rightMotorSpeed);
+        motor4.setSpeed(speedDifference);
         motor4.run(FORWARD);
       }
     }
+  }
   
 
    if(leftFrontIRValue == 1 && rightFrontIRValue== 0){
@@ -152,25 +153,32 @@ void hizAyari(){
   if (Serial1.available() > 0) {
     String value = Serial1.readString();
     Serial.println("value =  " + value);
+    stopMotors();
+    delay(100);
     if(value == "start") {
       rightMotorSpeed =  120;
       leftMotorSpeed =  120;
+      speedDifference = 70; 
     }
     if(value =="stop" ){
       rightMotorSpeed =  0;
       leftMotorSpeed =  0;
+      speedDifference = 0;
     }
     if(value =="1" ){
-      rightMotorSpeed =  100;
-      leftMotorSpeed =  100;
-    }
-    if(value == "2" ){
       rightMotorSpeed =  120;
       leftMotorSpeed =  120;
+      speedDifference = 70;
     }
-    if(value =="3" ){
+    if(value == "2" ){
       rightMotorSpeed =  150;
       leftMotorSpeed =  150;
+      speedDifference = 100;
+    }
+    if(value =="3" ){
+      rightMotorSpeed =  180;
+      leftMotorSpeed =  180;
+      speedDifference= 130;
     }
 
     Serial.println("right: " + String(rightMotorSpeed));
