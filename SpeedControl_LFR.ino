@@ -24,8 +24,9 @@ Message msg;
 boolean rightForward = true;
 boolean leftForward = true;
 
-int rightMotorSpeed;
-int leftMotorSpeed;
+int rightMotorSpeed =150;
+int leftMotorSpeed =150;
+int speedDifference =130;
 
 QTRSensors qtr;
 
@@ -45,6 +46,9 @@ int TCRT5000_1 = 51;  // IR sensoru sol
 
 boolean solIr = false;
 boolean sagIr = false;
+
+
+
 
 
 void setup() {
@@ -68,13 +72,9 @@ void loop() {
   int Sag_IR = digitalRead(TCRT5000);
   int Sol_IR = digitalRead(TCRT5000_1);
 
-  if (Sag_IR == 1 && Sol_IR == 0 ){
-    sagIr = true;
+  hizAyari();
 
-  }
-  if(Sag_IR == 0 && Sol_IR == 1){
-    solIr = true;
-  }
+  
 
 
   Serial.print("Sag = "); 
@@ -83,80 +83,166 @@ void loop() {
   Serial.println(String(Sol_IR));
   //delay(500); 5ms gecikmeli
 
-      if (!dmpReady) return;  // Eğer programlama başarısız olduysa hiçbir şey yapma.
 
-    if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Son gelen veriyi oku
+  if (!dmpReady) return;  // Eğer programlama başarısız olduysa hiçbir şey yapma.
+
+
+  if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
+     // Son gelen veriyi oku   
+    #ifdef OUTPUT_READABLE_YAWPITCHROLL
+      // EULER hesaplamalarına göre dereceleri hesapla
+      mpu.dmpGetQuaternion(&q, fifoBuffer);
+      mpu.dmpGetGravity(&gravity, &q);
+      mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+
+      float yawAngle = ypr[0] * 360 / M_PI;  // Yaw açısını derece cinsinden al
+      int yawDeger ;
+
+      if (Sag_IR == 1 && Sol_IR == 0 ){
+    sagIr = true;
+     yawDeger = int(yawAngle) + 50;
+
+  }
+  if(Sag_IR == 0 && Sol_IR == 1){
+    solIr = true;
+     yawDeger = int(yawAngle) - 50;
+  }
+
       
-        #ifdef OUTPUT_READABLE_YAWPITCHROLL
-            // EULER hesaplamalarına göre dereceleri hesapla
-            mpu.dmpGetQuaternion(&q, fifoBuffer);
-            mpu.dmpGetGravity(&gravity, &q);
-            mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
 
+      Serial.print("IMU\t");
+      Serial.println(yawAngle);
 
-            float yawAngle = ypr[0] * 180 / M_PI; // Yaw açısını derece cinsinden al
-
-            Serial.print("IMU\t");
-            Serial.println(yawAngle);
-            
-
-            // eğer sağ ır 1 ıse
-            if(Sag_IR == 0 && Sol_IR == 0){
-              position = qtr.readLineBlack(sensorValues); // Siyah çizgiyi takip et
-
-            } else if (sagIr){
-
-
-             int yawDeger = yawAngle + 90 ;
-
-             
-
-              if(yawAngle <= yawDeger){
-
-              leftMotorSpeed = 250;
-              rightMotorSpeed = 250;        //sag
-              leftForward = true;
-              rightForward = false;
-
-              Serial.println("******************** Sag IR 1 degerinde ********************");
-
-              if(yawAngle == yawDeger){
-                sagIr = false;
+        if(leftMotorSpeed != 0 && rightMotorSpeed != 0 && speedDifference != 0 ){ 
+          if(!sagIr && !solIr){
+            if(position <= 2500){
+              if(position > 1750){
+                motor1.setSpeed(speedDifference);
+                motor1.run(FORWARD);
+                motor2.setSpeed(speedDifference);
+                motor2.run(FORWARD);
+                motor3.setSpeed(speedDifference);
+                motor3.run(FORWARD);
+                motor4.setSpeed(speedDifference);
+                motor4.run(FORWARD);
               }
-              }/*else if(yawDeger == yawAngle){
-                sagIr =false;
-              }*/
- 
-            }else if(solIr){
-             int yawDeger = yawAngle - 90 ;
-              
-              if(yawDeger <= yawAngle){
-
-              leftMotorSpeed = 250;
-              rightMotorSpeed = 250;     //sol
-              rightForward = true;
-              leftForward = false;
-
-              Serial.println("******************** Sol IR 1 degerinde ********************");
-              if(yawAngle == yawDeger){
-                solIr = false;
+              else if(position > 1000){
+                motor1.setSpeed(leftMotorSpeed);
+                motor1.run(FORWARD);
+                motor2.setSpeed(speedDifference);
+                motor2.run(BACKWARD);
+                motor3.setSpeed(leftMotorSpeed);
+                motor3.run(FORWARD);
+                motor4.setSpeed(speedDifference);
+                motor4.run(BACKWARD);
+                Serial.println("SAĞA DÖNÜYOR");
               }
-              }/*else if(yawDeger == yawAngle){
-                solIr = false;
-              }*/
-
-
             }
+            else if(position <= 4000){
+              motor1.setSpeed(leftMotorSpeed);
+              motor1.run(FORWARD);
+              motor2.setSpeed(rightMotorSpeed);
+              motor2.run(FORWARD);
+              motor3.setSpeed(leftMotorSpeed);
+              motor3.run(FORWARD);
+              motor4.setSpeed(rightMotorSpeed);
+              motor4.run(FORWARD);
+            }
+            else if(position <= 5100){
+              if(position > 4500){
+                motor1.setSpeed(speedDifference);
+                motor1.run(BACKWARD);
+                motor2.setSpeed(rightMotorSpeed);
+                motor2.run(FORWARD);
+                motor3.setSpeed(speedDifference);
+                motor3.run(BACKWARD);
+                motor4.setSpeed(rightMotorSpeed);
+                motor4.run(FORWARD);
+                Serial.println("SOLA DÖNÜYOR");
+              }
+              else if(position > 4000){
+                motor1.setSpeed(speedDifference);
+                motor1.run(FORWARD);
+                motor2.setSpeed(speedDifference);
+                motor2.run(FORWARD);
+                motor3.setSpeed(speedDifference);
+                motor3.run(FORWARD);
+                motor4.setSpeed(speedDifference);
+                motor4.run(FORWARD);
+              }
+            }
+         } else if(sagIr){
+            while(yawAngle <= yawDeger){
+              if (!dmpReady) return;  // Eğer programlama başarısız olduysa hiçbir şey yapma.
+                if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
+                    // Son gelen veriyi oku                      
+                  #ifdef OUTPUT_READABLE_YAWPITCHROLL
+                  // EULER hesaplamalarına göre dereceleri hesapla
+                  mpu.dmpGetQuaternion(&q, fifoBuffer);
+                  mpu.dmpGetGravity(&gravity, &q);
+                  mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+                  yawAngle = ypr[0] * 360 / M_PI; // Yaw açısını derece cinsinden al              
+                  motor1.setSpeed(speedDifference);
+                  motor1.run(FORWARD);
+                  motor2.setSpeed(speedDifference);
+                  motor2.run(BACKWARD);
+                  motor3.setSpeed(speedDifference);
+                  motor3.run(FORWARD);
+                  motor4.setSpeed(speedDifference);
+                  motor4.run(BACKWARD);
+                  Serial.println("******************** Sag IR 1 degerinde ********************");
 
-            /*
-            Serial.print("\t");
-            Serial.print(ypr[1] * 180/M_PI);
-            Serial.print("\t");
-            Serial.println(ypr[2] * 180/M_PI);*/
-        #endif
+                  Serial.print("Yaw Deger = " );
+                  Serial.println(yawDeger);
+                  Serial.print("IMU\t");
+                  Serial.println(yawAngle);
+                  
+                  #endif
 
-        
-    }
+                    }
+
+              }
+              
+                sagIr = false;                           
+            
+          } else if(solIr){
+              while(yawDeger <= yawAngle){
+
+                if (!dmpReady) return;  // Eğer programlama başarısız olduysa hiçbir şey yapma.
+                if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
+                    // Son gelen veriyi oku                      
+                  #ifdef OUTPUT_READABLE_YAWPITCHROLL
+                  // EULER hesaplamalarına göre dereceleri hesapla
+                  mpu.dmpGetQuaternion(&q, fifoBuffer);
+                  mpu.dmpGetGravity(&gravity, &q);
+                  mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+                  yawAngle = ypr[0] * 360 / M_PI; // Yaw açısını derece cinsinden al 
+
+                  motor1.setSpeed(speedDifference);
+                  motor1.run(BACKWARD);
+                  motor2.setSpeed(speedDifference);
+                  motor2.run(FORWARD);
+                  motor3.setSpeed(speedDifference);
+                  motor3.run(BACKWARD);
+                  motor4.setSpeed(speedDifference);
+                  motor4.run(FORWARD);
+                  
+                  Serial.println("******************** Sol IR 1 degerinde ********************");
+                  Serial.print("Yaw Deger = " );
+                  Serial.println(yawDeger);
+                  Serial.print("IMU\t");
+                  Serial.println(yawAngle);
+
+                  #endif
+
+                }
+              } 
+             solIr=false;
+
+            } 
+      }
+    #endif  
+  }
 
   qtr.read(sensorValues); // Sensör değerlerini oku
 
@@ -171,50 +257,13 @@ void loop() {
     //Serial.print('\t');
   }
 
-  if(position <= 2500){
-    if(position > 1750){
-      leftMotorSpeed = 120;
-      rightMotorSpeed = 70;
-      rightForward = true;
-      leftForward = true;
-    }
-    else if(position > 1000){
-      leftMotorSpeed = 80;
-      rightMotorSpeed = 80;        //sag
-      leftForward = true;
-      rightForward = false;
-    }
-  }
-  else if(position <= 4000){
-    leftMotorSpeed = 120;
-    rightMotorSpeed = 120;
-    rightForward = true;
-    leftForward = true;
-  }
-  else if(position <= 5100){
-    if(position > 4500){
-      leftMotorSpeed = 80;
-      rightMotorSpeed = 80;     //sol
-      rightForward = true;
-      leftForward = false;
-    }
-    else if(position > 4000){
-      leftMotorSpeed = 70;
-      rightMotorSpeed = 120;
-      leftForward = true;
-      rightForward = true;
-    }
-  }
+  
   //Serial1.println(position);
 
   //msg.leftPWM = leftMotorSpeed;
   //msg.rightPWM = rightMotorSpeed;
 
-  motor1.setSpeed(leftMotorSpeed);
-  motor2.setSpeed(rightMotorSpeed);
-  motor3.setSpeed(leftMotorSpeed);
-  motor4.setSpeed(rightMotorSpeed);
-
+ 
   
   //LoRa_Send(msg);
 
@@ -231,28 +280,6 @@ void loop() {
   //  Serial1.write(msg.sensorArray[i]);
   //}
 
-  if(rightForward){
-    motor2.run(FORWARD);
-    motor4.run(FORWARD);
-  }
-  else{
-    motor2.run(BACKWARD);
-    motor4.run(BACKWARD);
-  }
-
-  if(leftForward){
-    motor1.run(FORWARD);
-    motor3.run(FORWARD);
-  }
-  else{
-    motor1.run(BACKWARD);
-    motor3.run(BACKWARD);
-  }
-
-  if((millis() - timer) > sampleTime){
-    AGV_Telemetry_UART_Send();
-    timer = millis();
-  }
 }
 
 
@@ -318,7 +345,42 @@ void setQTRSensorArray(){
   }
   Serial.println();
 }
+void hizAyari(){
+  if (Serial1.available() > 0) {
+    String value = Serial1.readString();
+    Serial.println("value =  " + value);
+    bekle();
+    delay(200);
+    if(value == "start") {
+      rightMotorSpeed =  120;
+      leftMotorSpeed =  120;
+      speedDifference = 70; 
+    }
+    if(value =="stop" ){
+      rightMotorSpeed =  0;
+      leftMotorSpeed =  0;
+      speedDifference = 0;
+    }
+    if(value =="1" ){
+      rightMotorSpeed =  120;
+      leftMotorSpeed =  120;
+      speedDifference = 70;
+    }
+    if(value == "2" ){
+      rightMotorSpeed =  150;
+      leftMotorSpeed =  150;
+      speedDifference = 100;
+    }
+    if(value =="3" ){
+      rightMotorSpeed =  180;
+      leftMotorSpeed =  180;
+      speedDifference= 130;
+    }
 
+    Serial.println("right: " + String(rightMotorSpeed));
+    Serial.println("left: " + String(leftMotorSpeed));
+ }
+}
 
 
 void AGV_Telemetry_UART_Send(){
