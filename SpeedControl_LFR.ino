@@ -1,234 +1,339 @@
-  //Kadir Branch
+#include <AFMotor.h>
+#include <QTRSensors.h>
+#include "MPU6050_DMP6.h"
+#define OUTPUT_READABLE_YAWPITCHROLL
 
-  #include <AFMotor.h>
-  #include <QTRSensors.h>
 
-  AF_DCMotor motor1(4);  // Motor 1 -> Sol ön
-  AF_DCMotor motor2(3);  // Motor 2 -> Sağ ön
-  AF_DCMotor motor3(1);  // Motor 3 -> Sol arka
-  AF_DCMotor motor4(2);  // Motor 4 -> Sağ arka
 
-  typedef struct{
-    byte rightPWM;
-    byte leftPWM;
-    int position;
-    byte Rir;
-    byte Lir;
-    byte sensorArray[8];
+AF_DCMotor motor1(4);  // Motor 1 -> Sol ön
+AF_DCMotor motor2(3);  // Motor 2 -> Sağ ön
+AF_DCMotor motor3(1);  // Motor 3 -> Sol arka
+AF_DCMotor motor4(2);  // Motor 4 -> Sağ arka
 
-  }Message;
 
-  Message msg;
+typedef struct{
+  byte rightPWM;
+  byte leftPWM;
+  int position;
+  byte sensorArray[8];
+}Message;
 
-  int rightMotorSpeed;
-  int leftMotorSpeed ;
+Message msg;
 
-  QTRSensors qtr;
 
-  const uint8_t SensorCount = 8;
-  unsigned int sensorValues[SensorCount];
-  int QTR_Sensor_Array[SensorCount];
-  unsigned int position;
+boolean rightForward = true;
+boolean leftForward = true;
 
-  String value = "";
-  const int leftFrontIRSensorPin = A15;
-  const int rightFrontIRSensorPin = A14;
+int rightMotorSpeed;
+int leftMotorSpeed;
 
-  void setup() {
+QTRSensors qtr;
 
-    Serial1.begin(9600);
-    Serial.begin(9600);
+const uint8_t SensorCount = 8;
+unsigned int sensorValues[SensorCount];
+int QTR_Sensor_Array[SensorCount];
+unsigned int position;
 
-    pinMode(leftFrontIRSensorPin, INPUT);
-    pinMode(rightFrontIRSensorPin, INPUT);
+unsigned long timer = 0;
+int sampleTime = 500;
 
-    qtr.setTypeRC();
-    qtr.setSensorPins((const uint8_t[]) {44, 42, 40, 38, 36, 34, 32, 30}, SensorCount);
-    qtr_calibrate();
-    delay(2000);
+
+byte BASE_SPEED = 150;
+
+int TCRT5000 =53;    //IR senoru sag
+int TCRT5000_1 = 51;  // IR sensoru sol
+
+boolean solIr = false;
+boolean sagIr = false;
+
+
+void setup() {
+  Serial1.begin(9600);
+  Serial.begin(9600);
+
+  MPU_init();
+
+ 
+
+  qtr.setTypeRC();
+  //qtr.setSensorPins((const uint8_t[]) {30, 32, 34, 36, 38, 40, 42, 44}, SensorCount);
+  qtr.setSensorPins((const uint8_t[]) {44, 42, 40, 38, 36, 34, 32, 30}, SensorCount);
+
+  qtr_calibrate();
+  delay(2000);
+  
+}
+void loop() {
+
+  int Sag_IR = digitalRead(TCRT5000);
+  int Sol_IR = digitalRead(TCRT5000_1);
+
+  if (Sag_IR == 1 && Sol_IR == 0 ){
+    sagIr = true;
+
+  }
+  if(Sag_IR == 0 && Sol_IR == 1){
+    solIr = true;
   }
 
-  void loop() {
-    qtr.read(sensorValues); // Sensör değerlerini oku
-    position = qtr.readLineBlack(sensorValues);
-    Serial.println("Konum: " + String(position));
 
-    int leftFrontIRValue = digitalRead(leftFrontIRSensorPin);
-    int rightFrontIRValue = digitalRead(rightFrontIRSensorPin);
-    //Serial.println("Sağ IR = " + String(rightFrontIRValue));
-    //Serial.println("Sol IR = " + String(leftFrontIRValue));
+  Serial.print("Sag = "); 
+  Serial.println(String(Sag_IR));
+  Serial.print("Sol = "); 
+  Serial.println(String(Sol_IR));
+  //delay(500); 5ms gecikmeli
 
-    Serial.println("Sağ PWM= " +  String(rightMotorSpeed));
-    Serial.println("Sol PWM= " +  String(leftMotorSpeed));
+      if (!dmpReady) return;  // Eğer programlama başarısız olduysa hiçbir şey yapma.
+
+    if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Son gelen veriyi oku
+      
+        #ifdef OUTPUT_READABLE_YAWPITCHROLL
+            // EULER hesaplamalarına göre dereceleri hesapla
+            mpu.dmpGetQuaternion(&q, fifoBuffer);
+            mpu.dmpGetGravity(&gravity, &q);
+            mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
 
 
-    hizAyari();
+            float yawAngle = ypr[0] * 180 / M_PI; // Yaw açısını derece cinsinden al
+
+            Serial.print("IMU\t");
+            Serial.println(yawAngle);
+            
+
+            // eğer sağ ır 1 ıse
+            if(Sag_IR == 0 && Sol_IR == 0){
+              position = qtr.readLineBlack(sensorValues); // Siyah çizgiyi takip et
+
+            } else if (sagIr){
+
+
+             int yawDeger = yawAngle + 90 ;
+
+             
+
+              if(yawAngle <= yawDeger){
+
+              leftMotorSpeed = 250;
+              rightMotorSpeed = 250;        //sag
+              leftForward = true;
+              rightForward = false;
+
+              Serial.println("******************** Sag IR 1 degerinde ********************");
+
+              if(yawAngle == yawDeger){
+                sagIr = false;
+              }
+              }/*else if(yawDeger == yawAngle){
+                sagIr =false;
+              }*/
+ 
+            }else if(solIr){
+             int yawDeger = yawAngle - 90 ;
+              
+              if(yawDeger <= yawAngle){
+
+              leftMotorSpeed = 250;
+              rightMotorSpeed = 250;     //sol
+              rightForward = true;
+              leftForward = false;
+
+              Serial.println("******************** Sol IR 1 degerinde ********************");
+              if(yawAngle == yawDeger){
+                solIr = false;
+              }
+              }/*else if(yawDeger == yawAngle){
+                solIr = false;
+              }*/
+
+
+            }
+
+            /*
+            Serial.print("\t");
+            Serial.print(ypr[1] * 180/M_PI);
+            Serial.print("\t");
+            Serial.println(ypr[2] * 180/M_PI);*/
+        #endif
+
+        
+    }
+
+  qtr.read(sensorValues); // Sensör değerlerini oku
+
+  position = qtr.readLineBlack(sensorValues); // Siyah çizgiyi takip et
+  //setQTRSensorArray();
+
+  //msg.position = position;
+  //Serial.println("Konum: " + String(position));
+  
+  for (int i = 0; i < 8; i++) {
+    //Serial.print(sensorValues[i]);
+    //Serial.print('\t');
+  }
+
+  if(position <= 2500){
+    if(position > 1750){
+      leftMotorSpeed = 120;
+      rightMotorSpeed = 70;
+      rightForward = true;
+      leftForward = true;
+    }
+    else if(position > 1000){
+      leftMotorSpeed = 80;
+      rightMotorSpeed = 80;        //sag
+      leftForward = true;
+      rightForward = false;
+    }
+  }
+  else if(position <= 4000){
+    leftMotorSpeed = 120;
+    rightMotorSpeed = 120;
+    rightForward = true;
+    leftForward = true;
+  }
+  else if(position <= 5100){
+    if(position > 4500){
+      leftMotorSpeed = 80;
+      rightMotorSpeed = 80;     //sol
+      rightForward = true;
+      leftForward = false;
+    }
+    else if(position > 4000){
+      leftMotorSpeed = 70;
+      rightMotorSpeed = 120;
+      leftForward = true;
+      rightForward = true;
+    }
+  }
+  //Serial1.println(position);
+
+  //msg.leftPWM = leftMotorSpeed;
+  //msg.rightPWM = rightMotorSpeed;
+
+  motor1.setSpeed(leftMotorSpeed);
+  motor2.setSpeed(rightMotorSpeed);
+  motor3.setSpeed(leftMotorSpeed);
+  motor4.setSpeed(rightMotorSpeed);
 
   
-    if(position <= 2500){
-      if(position > 1750){
-        motor1.setSpeed(leftMotorSpeed);
-        motor1.run(FORWARD);
-        motor2.setSpeed(rightMotorSpeed - (rightMotorSpeed * 0.2));
-        motor2.run(FORWARD);
-        motor3.setSpeed(leftMotorSpeed);
-        motor3.run(FORWARD);
-        motor4.setSpeed(rightMotorSpeed - (rightMotorSpeed * 0.2));
-        motor4.run(FORWARD);
-      }
-      else if(position > 1000){
-        motor1.setSpeed(leftMotorSpeed);
-        motor1.run(FORWARD);
-        motor2.setSpeed(rightMotorSpeed);
-        motor2.run(BACKWARD);
-        motor3.setSpeed(leftMotorSpeed);
-        motor3.run(FORWARD);
-        motor4.setSpeed(rightMotorSpeed);
-        motor4.run(BACKWARD);
-      }
-    }
-    else if(position <= 4000){
-      motor1.setSpeed(leftMotorSpeed);
-      motor1.run(FORWARD);
-      motor2.setSpeed(rightMotorSpeed);
-      motor2.run(FORWARD);
-      motor3.setSpeed(leftMotorSpeed);
-      motor3.run(FORWARD);
-      motor4.setSpeed(rightMotorSpeed);
-      motor4.run(FORWARD);
-    }
-    else if(position <= 5100){
-      if(position > 4500){
-        motor1.setSpeed(leftMotorSpeed);
-        motor1.run(BACKWARD);
-        motor2.setSpeed(rightMotorSpeed);
-        motor2.run(FORWARD);
-        motor3.setSpeed(leftMotorSpeed);
-        motor3.run(BACKWARD);
-        motor4.setSpeed(rightMotorSpeed);
-        motor4.run(FORWARD);
-      }
-      else if(position > 4000){
-        motor1.setSpeed(leftMotorSpeed - (leftMotorSpeed * 0.2));
-        motor1.run(FORWARD);
-        motor2.setSpeed(rightMotorSpeed);
-        motor2.run(FORWARD);
-        motor3.setSpeed(leftMotorSpeed - (leftMotorSpeed * 0.2));
-        motor3.run(FORWARD);
-        motor4.setSpeed(rightMotorSpeed);
-        motor4.run(FORWARD);
-      }
-    }
-  
+  //LoRa_Send(msg);
 
-   if(leftFrontIRValue == 1 && rightFrontIRValue== 0){
-      /*
-      motor1.setSpeed(leftMotorSpeed);
-      motor1.run(BACKWARD);
-      motor2.setSpeed(rightMotorSpeed);
-      motor2.run(FORWARD);
-      motor3.setSpeed(leftMotorSpeed);
-      motor3.run(BACKWARD);
-      motor4.setSpeed(rightMotorSpeed);
-      motor4.run(FORWARD);
-      */
-      Serial.println("SOLA 90 DÖNÜYOR");
-    }
-    if(rightFrontIRValue== 1 && leftFrontIRValue == 0 ){
-      /*
-      motor1.setSpeed(leftMotorSpeed);
-      motor1.run(FORWARD);
-      motor2.setSpeed(rightMotorSpeed);
-      motor2.run(BACKWARD);
-      motor3.setSpeed(leftMotorSpeed);
-      motor3.run(FORWARD);
-      motor4.setSpeed(rightMotorSpeed);
-      motor4.run(BACKWARD);
-      */
-      Serial.println("SAĞA 90 DÖNÜYOR");
-    }
+  /*
+  Serial.println("\nSağ motor pwm : " + String(rightMotorSpeed));
+  Serial.println("Sol motor pwm : " + String(leftMotorSpeed));
+  Serial.println("\n ******************** \n");
+  */
+
+  //Serial1.write(msg.leftPWM);
+  //Serial1.write(msg.rightPWM);
+
+  //for (int i = 0; i < 8; i++) {
+  //  Serial1.write(msg.sensorArray[i]);
+  //}
+
+  if(rightForward){
+    motor2.run(FORWARD);
+    motor4.run(FORWARD);
+  }
+  else{
+    motor2.run(BACKWARD);
+    motor4.run(BACKWARD);
   }
 
-
-  void hizAyari(){
-    if (Serial1.available() > 0) {
-      String value = Serial1.readString();
-      Serial.println("Value =  " + value);
-      if(value == "start") {
-        rightMotorSpeed =  120;
-        leftMotorSpeed =  120;
-      }
-      if(value == "stop" ){
-        stopMotors();
-      }
-      if(value == "1" ){
-        rightMotorSpeed =  80;
-        leftMotorSpeed =  80;
-      }
-      if(value == "2" ){
-        rightMotorSpeed =  100;
-        leftMotorSpeed =  100;
-      }
-      if(value == "3" ){
-        rightMotorSpeed =  120;
-        leftMotorSpeed =  120;
-      }
-
-      //Serial.println("right: " + String(rightMotorSpeed));
-      //Serial.println("left: " + String(leftMotorSpeed));
-    }
+  if(leftForward){
+    motor1.run(FORWARD);
+    motor3.run(FORWARD);
+  }
+  else{
+    motor1.run(BACKWARD);
+    motor3.run(BACKWARD);
   }
 
-  void qtr_calibrate() {
-    Serial.println("QTR-8RC Kalibrasyon Başladı.");
-    for (byte i = 0; i < 250; i++) {
-      qtr.calibrate();
-      delay(10);
-    }
-    Serial.println("QTR-8RC Kalibrasyon Bitti.");
+  if((millis() - timer) > sampleTime){
+    AGV_Telemetry_UART_Send();
+    timer = millis();
+  }
+}
 
-    Serial.println("\nQTR-8RC Calibration Min Values;");
-    for (uint8_t i = 0; i < SensorCount; i++)
-    {
-      Serial.print(qtr.calibrationOn.minimum[i]);
-      Serial.print(' ');
-    }
-    Serial.println();
 
-    Serial.println("QTR-8RC Calibration Max Values;");
-    for (uint8_t i = 0; i < SensorCount; i++)
-    {
-      Serial.print(qtr.calibrationOn.maximum[i]);
-      Serial.print(' ');
-    }
-    Serial.println();
+void qtr_calibrate() {
+  Serial.println("QTR-8RC Kalibrasyon Başladı.");
+
+  for (byte i = 0; i < 250; i++) {
+    qtr.calibrate();
+   
+    delay(10);
+  }
+  //bekle(); // motorları durdur
+  //Serial.println("QTR-8RC Kalibrasyon Bitti.");
+
+  Serial.println("\nQTR-8RC Calibration Min Values;");
+  for (uint8_t i = 0; i < SensorCount; i++)
+  {
+    Serial.print(qtr.calibrationOn.minimum[i]);
+    Serial.print(' ');
+  }
+  Serial.println();
+
+  //Serial.println("QTR-8RC Calibration Max Values;");
+  // print the calibration maximum values measured when emitters were on
+  for (uint8_t i = 0; i < SensorCount; i++)
+  {
+    Serial.print(qtr.calibrationOn.maximum[i]);
+    Serial.print(' ');
+  }
+  Serial.println();
+}
+
+
+void bekle() {
+  // Motorları durdurur.
+
+  motor1.setSpeed(BASE_SPEED);
+  motor2.setSpeed(BASE_SPEED);
+  motor3.setSpeed(BASE_SPEED);
+  motor4.setSpeed(BASE_SPEED);
+ 
+  Serial.println("Dur");
+  motor1.run(RELEASE);
+  motor2.run(RELEASE);
+  motor3.run(RELEASE);
+  motor4.run(RELEASE);
+}
+
+
+void setQTRSensorArray(){
+  for(int i = 0; i < 8; i++){
+    if(sensorValues[i] > 700)
+      QTR_Sensor_Array[i] = 1;
+    else
+      QTR_Sensor_Array[i] = 0;
   }
 
-  // Motorları durdurma fonksiyonu
-  void stopMotors() {
-    motor1.setSpeed(0);
-    motor1.run(RELEASE);
-    motor2.setSpeed(0);
-    motor2.run(RELEASE);
-    motor3.setSpeed(0);
-    motor3.run(RELEASE);
-    motor4.setSpeed(0);
-    motor4.run(RELEASE);
+  //msg.sensorArray[8] = QTR_Sensor_Array[8];
+
+  Serial.println("Backend'e gonderilecek QTR Sensor Dizisi;");
+  for(int i = 0; i < 8; i++){
+    Serial.print(String(QTR_Sensor_Array[i]) + "\t");
   }
+  Serial.println();
+}
 
-  void AGV_Telemetry_UART_Send(){
-    String msg = "";
-    msg += String(position) + "," + String(leftMotorSpeed) + "," + String(rightMotorSpeed) + "," + String(rightFrontIRValue) + "," + String(leftFrontIRValue) + ",";
 
-    for(int i = 0; i < 8; i++){
-      if(sensorValues[i] > 700){
-        msg += "1";
-      }
-      else{
-        msg += "0";
-      }
+
+void AGV_Telemetry_UART_Send(){
+  String msg = "";
+  msg += String(position) + "," + String(leftMotorSpeed) + "," + String(rightMotorSpeed) + ",";
+
+  for(int i = 0; i < 8; i++){
+    if(sensorValues[i] > 700){
+      msg += "1";
     }
-    msg += ",";
-    Serial1.println(msg);
-    Serial.println(msg);
+    else{
+      msg += "0";
+    }
   }
+  msg += ",";
+  Serial1.println(msg);
+  Serial.println(msg);
+}
