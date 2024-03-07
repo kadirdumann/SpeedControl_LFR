@@ -16,9 +16,9 @@ typedef struct{
 }Message;
 Message msg;
 
-int rightMotorSpeed;
-int leftMotorSpeed ;
-int speedDifference ;
+int rightMotorSpeed ;
+int leftMotorSpeed  ;
+int speedDifference  ;
 
 QTRSensors qtr;
 
@@ -27,8 +27,11 @@ unsigned int sensorValues[SensorCount];
 int QTR_Sensor_Array[SensorCount];
 unsigned int position;
 String value = "";
-const int leftFrontIRSensorPin = A15;
-const int rightFrontIRSensorPin = A14;
+const int leftFrontIRSensorPin = 24;
+const int rightFrontIRSensorPin = 26;
+boolean sagIr= false;
+boolean solIr=false;
+
 
 void setup() {
   Serial1.begin(9600);
@@ -49,103 +52,114 @@ void loop() {
   Serial.println("Konum: " + String(position));
   int leftFrontIRValue = digitalRead(leftFrontIRSensorPin);
   int rightFrontIRValue = digitalRead(rightFrontIRSensorPin);
-  //Serial.print("sağ ir = " + String(rightFrontIRValue));
-  //Serial.println(" sol ir = " + String(leftFrontIRValue));
-
-  Serial.println("sağ= " +  String(rightMotorSpeed));
-  Serial.println("sol= " +  String(leftMotorSpeed));
+  if(leftFrontIRValue == 1 && rightFrontIRValue == 0){
+    solIr = true;
+  }
+  if(leftFrontIRValue == 0 && rightFrontIRValue == 1){
+    sagIr=true;
+  }
+  Serial.print("sağ ir = " + String(rightFrontIRValue));
+  Serial.println(" sol ir = " + String(leftFrontIRValue));
 
 
   hizAyari();
 
   if(leftMotorSpeed != 0 && rightMotorSpeed != 0 && speedDifference != 0 ){ 
-    if(position <= 2500){
-      if(position > 1750){
-        motor1.setSpeed(speedDifference);
-        motor1.run(FORWARD);
-        motor2.setSpeed(speedDifference);
-        motor2.run(FORWARD);
-        motor3.setSpeed(speedDifference);
-        motor3.run(FORWARD);
-        motor4.setSpeed(speedDifference);
-        motor4.run(FORWARD);
+    if(!sagIr && !solIr){
+      if(position <= 2500){
+        if(position > 1750){
+          motor1.setSpeed(speedDifference);
+          motor1.run(FORWARD);
+          motor2.setSpeed(speedDifference);
+          motor2.run(FORWARD);
+          motor3.setSpeed(speedDifference);
+          motor3.run(FORWARD);
+          motor4.setSpeed(speedDifference);
+          motor4.run(FORWARD);
+        }
+        else if(position > 1000){
+          motor1.setSpeed(leftMotorSpeed);
+          motor1.run(FORWARD);
+          motor2.setSpeed(speedDifference);
+          motor2.run(BACKWARD);
+          motor3.setSpeed(leftMotorSpeed);
+          motor3.run(FORWARD);
+          motor4.setSpeed(speedDifference);
+          motor4.run(BACKWARD);
+          Serial.println("SAĞA DÖNÜYOR");
+        }
       }
-      else if(position > 1000){
+      else if(position <= 4000){
         motor1.setSpeed(leftMotorSpeed);
         motor1.run(FORWARD);
-        motor2.setSpeed(speedDifference);
-        motor2.run(BACKWARD);
+        motor2.setSpeed(rightMotorSpeed);
+        motor2.run(FORWARD);
         motor3.setSpeed(leftMotorSpeed);
         motor3.run(FORWARD);
-        motor4.setSpeed(speedDifference);
-        motor4.run(BACKWARD);
-        Serial.println("SAĞA DÖNÜYOR");
+        motor4.setSpeed(rightMotorSpeed);
+        motor4.run(FORWARD);
       }
-    }
-    else if(position <= 4000){
-      motor1.setSpeed(leftMotorSpeed);
-      motor1.run(FORWARD);
-      motor2.setSpeed(rightMotorSpeed);
-      motor2.run(FORWARD);
-      motor3.setSpeed(leftMotorSpeed);
-      motor3.run(FORWARD);
-      motor4.setSpeed(rightMotorSpeed);
-      motor4.run(FORWARD);
-    }
-    else if(position <= 5100){
-      if(position > 4500){
+      else if(position <= 5100){
+        if(position > 4500){
+          motor1.setSpeed(speedDifference);
+          motor1.run(BACKWARD);
+          motor2.setSpeed(rightMotorSpeed);
+          motor2.run(FORWARD);
+          motor3.setSpeed(speedDifference);
+          motor3.run(BACKWARD);
+          motor4.setSpeed(rightMotorSpeed);
+          motor4.run(FORWARD);
+          Serial.println("SOLA DÖNÜYOR");
+        }
+        else if(position > 4000){
+          motor1.setSpeed(speedDifference);
+          motor1.run(FORWARD);
+          motor2.setSpeed(speedDifference);
+          motor2.run(FORWARD);
+          motor3.setSpeed(speedDifference);
+          motor3.run(FORWARD);
+          motor4.setSpeed(speedDifference);
+          motor4.run(FORWARD);
+        }
+      }
+      } else if(solIr){
+        int i = 0;
+        while(i<10){
         motor1.setSpeed(speedDifference);
         motor1.run(BACKWARD);
-        motor2.setSpeed(rightMotorSpeed);
+        motor2.setSpeed(speedDifference);
         motor2.run(FORWARD);
         motor3.setSpeed(speedDifference);
         motor3.run(BACKWARD);
-        motor4.setSpeed(rightMotorSpeed);
+        motor4.setSpeed(speedDifference);
         motor4.run(FORWARD);
-        Serial.println("SOLA DÖNÜYOR");
-      }
-      else if(position > 4000){
+         Serial.println("SOLA 90 DÖNÜYOR");
+         i++;
+        }
+        solIr=false;
+        
+       
+      } else if(sagIr){
+        int i = 0;
+        while(i<10){
         motor1.setSpeed(speedDifference);
         motor1.run(FORWARD);
         motor2.setSpeed(speedDifference);
-        motor2.run(FORWARD);
+        motor2.run(BACKWARD);
         motor3.setSpeed(speedDifference);
         motor3.run(FORWARD);
         motor4.setSpeed(speedDifference);
-        motor4.run(FORWARD);
-      }
-    }
-  }
-  
+        motor4.run(BACKWARD);
+        i++;
+        Serial.println("SAĞA 90 DÖNÜYOR");
+        }
+        sagIr=false;
+        
+        
+      } 
+   
 
-   if(leftFrontIRValue == 1 && rightFrontIRValue== 0){
-    /*
-    motor1.setSpeed(speedDifference);
-    motor1.run(BACKWARD);
-    motor2.setSpeed(speedDifference);
-    motor2.run(FORWARD);
-    motor3.setSpeed(speedDifference);
-    motor3.run(BACKWARD);
-    motor4.setSpeed(speedDifference);
-    motor4.run(FORWARD);
-    */
-    Serial.println("SOLA 90 DÖNÜYOR");
-  }
-  if(rightFrontIRValue== 1 && leftFrontIRValue == 0 ){
-    /*
-    motor1.setSpeed(speedDifference);
-    motor1.run(FORWARD);
-    motor2.setSpeed(speedDifference);
-    motor2.run(BACKWARD);
-    motor3.setSpeed(speedDifference);
-    motor3.run(FORWARD);
-    motor4.setSpeed(speedDifference);
-    motor4.run(BACKWARD);
-    */
-    Serial.println("SAĞA 90 DÖNÜYOR");
-  }
-
-  
+  } 
 }
 
 
@@ -154,7 +168,7 @@ void hizAyari(){
     String value = Serial1.readString();
     Serial.println("value =  " + value);
     stopMotors();
-    delay(100);
+    delay(200);
     if(value == "start") {
       rightMotorSpeed =  120;
       leftMotorSpeed =  120;
