@@ -45,8 +45,11 @@
   int sampleTime = 500;
 
   String value = "";
-  int leftFrontIRSensorPin = 51;
-  int rightFrontIRSensorPin = 53;
+  const int leftFrontIRSensorPin = 51;
+  const int rightFrontIRSensorPin = 53;
+
+  int leftFrontIRValue = 0;
+  int rightFrontIRValue = 0;
 
   void setup() {
 
@@ -336,7 +339,7 @@
 
   void AGV_Telemetry_UART_Send(){
     String msg = "";
-    msg += String(position) + "," + String(leftMotorSpeed) + "," + String(rightMotorSpeed) + "," + String(rightFrontIRSensorPin) + String(leftFrontIRSensorPin) + ","  ;
+    msg += String(position) + "," + String(leftMotorSpeed) + "," + String(rightMotorSpeed) + "," + String(rightFrontIRValue) + String(leftFrontIRValue) + ","  ;
 
     for(int i = 0; i < 8; i++){
       if(sensorValues[i] > 700){
