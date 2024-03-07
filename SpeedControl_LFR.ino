@@ -2,6 +2,8 @@
 
   #include <AFMotor.h>
   #include <QTRSensors.h>
+  #include "MPU6050_DMP6.h"
+  #define OUTPUT_READABLE_YAWPITCHROLL
 
   AF_DCMotor motor1(4);  // Motor 1 -> Sol ön
   AF_DCMotor motor2(3);  // Motor 2 -> Sağ ön
@@ -12,16 +14,21 @@
     byte rightPWM;
     byte leftPWM;
     int position;
-    byte Rir;
-    byte Lir;
+    byte ir[2];
     byte sensorArray[8];
-
   }Message;
 
   Message msg;
 
-  int rightMotorSpeed;
-  int leftMotorSpeed ;
+  boolean rightForward = true;
+  boolean leftForward = true;
+
+  boolean leftIr = false;
+  boolean rightIr = false;
+
+  int rightMotorSpeed =  120;
+  int leftMotorSpeed =  120;
+  int speedDifference = 70;
 
   QTRSensors qtr;
 
@@ -30,17 +37,23 @@
   int QTR_Sensor_Array[SensorCount];
   unsigned int position;
 
+  String UART_DATA = "";
+  byte UART_LENGTH = 0;
+  boolean UART_COMPLETE = false;
+
+  unsigned long timer = 0;
+  int sampleTime = 500;
+
   String value = "";
-  const int leftFrontIRSensorPin = A15;
-  const int rightFrontIRSensorPin = A14;
+  int leftFrontIRSensorPin = 51;
+  int rightFrontIRSensorPin = 53;
 
   void setup() {
 
     Serial1.begin(9600);
     Serial.begin(9600);
 
-    pinMode(leftFrontIRSensorPin, INPUT);
-    pinMode(rightFrontIRSensorPin, INPUT);
+    MPU_init();
 
     qtr.setTypeRC();
     qtr.setSensorPins((const uint8_t[]) {44, 42, 40, 38, 36, 34, 32, 30}, SensorCount);
@@ -49,135 +62,201 @@
   }
 
   void loop() {
+    UART_Control();
+
     qtr.read(sensorValues); // Sensör değerlerini oku
     position = qtr.readLineBlack(sensorValues);
-    Serial.println("Konum: " + String(position));
+    //Serial.println("Konum: " + String(position));
 
     int leftFrontIRValue = digitalRead(leftFrontIRSensorPin);
     int rightFrontIRValue = digitalRead(rightFrontIRSensorPin);
-    //Serial.println("Sağ IR = " + String(rightFrontIRValue));
-    //Serial.println("Sol IR = " + String(leftFrontIRValue));
-
-    Serial.println("Sağ PWM= " +  String(rightMotorSpeed));
-    Serial.println("Sol PWM= " +  String(leftMotorSpeed));
-
-
+    
     hizAyari();
 
-  
-    if(position <= 2500){
-      if(position > 1750){
-        motor1.setSpeed(leftMotorSpeed);
-        motor1.run(FORWARD);
-        motor2.setSpeed(rightMotorSpeed - (rightMotorSpeed * 0.2));
-        motor2.run(FORWARD);
-        motor3.setSpeed(leftMotorSpeed);
-        motor3.run(FORWARD);
-        motor4.setSpeed(rightMotorSpeed - (rightMotorSpeed * 0.2));
-        motor4.run(FORWARD);
+    if (!dmpReady) return;  // Eğer programlama başarısız olduysa hiçbir şey yapma.
+
+    if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Son gelen veriyi oku
+      
+      #ifdef OUTPUT_READABLE_YAWPITCHROLL
+        // EULER hesaplamalarına göre dereceleri hesapla
+        mpu.dmpGetQuaternion(&q, fifoBuffer);
+        mpu.dmpGetGravity(&gravity, &q);
+        mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+
+        float yawAngle = ypr[0] * 360 / M_PI; // Yaw açısını derece cinsinden al
+        int yawDeger ;    
+
+        if (rightFrontIRValue == 1 && leftFrontIRValue == 0 ){
+          rightIr = true;
+          yawDeger = int(yawAngle) + 45;
+        }
+        if(rightFrontIRValue == 0 && leftFrontIRValue == 1){
+          leftIr = true;
+          yawDeger = int(yawAngle) - 45;
+        }
+        if(leftMotorSpeed != 0 && rightMotorSpeed != 0 && speedDifference != 0 ){ 
+          if(!rightIr && !leftIr){
+            if(position <= 2500){
+              if(position > 1750){
+                motor1.setSpeed(speedDifference);
+                motor1.run(FORWARD);
+                motor2.setSpeed(speedDifference);
+                motor2.run(FORWARD);
+                motor3.setSpeed(speedDifference);
+                motor3.run(FORWARD);
+                motor4.setSpeed(speedDifference);
+                motor4.run(FORWARD);
+              }
+              else if(position > 1000){
+                motor1.setSpeed(leftMotorSpeed);
+                motor1.run(FORWARD);
+                motor2.setSpeed(speedDifference);
+                motor2.run(BACKWARD);
+                motor3.setSpeed(leftMotorSpeed);
+                motor3.run(FORWARD);
+                motor4.setSpeed(speedDifference);
+                motor4.run(BACKWARD);
+                Serial.println("SAĞA DÖNÜYOR");
+              }
+            }
+            else if(position <= 4000){
+              motor1.setSpeed(leftMotorSpeed);
+              motor1.run(FORWARD);
+              motor2.setSpeed(rightMotorSpeed);
+              motor2.run(FORWARD);
+              motor3.setSpeed(leftMotorSpeed);
+              motor3.run(FORWARD);
+              motor4.setSpeed(rightMotorSpeed);
+              motor4.run(FORWARD);
+            }
+            else if(position <= 5100){
+              if(position > 4500){
+                motor1.setSpeed(speedDifference);
+                motor1.run(BACKWARD);
+                motor2.setSpeed(rightMotorSpeed);
+                motor2.run(FORWARD);
+                motor3.setSpeed(speedDifference);
+                motor3.run(BACKWARD);
+                motor4.setSpeed(rightMotorSpeed);
+                motor4.run(FORWARD);
+                Serial.println("SOLA DÖNÜYOR");
+              }
+              else if(position > 4000){
+                motor1.setSpeed(speedDifference);
+                motor1.run(FORWARD);
+                motor2.setSpeed(speedDifference);
+                motor2.run(FORWARD);
+                motor3.setSpeed(speedDifference);
+                motor3.run(FORWARD);
+                motor4.setSpeed(speedDifference);
+                motor4.run(FORWARD);
+              }
+            }
+          }
+        } else if(rightIr){
+            while(yawAngle <= yawDeger){
+              if (!dmpReady) return;  // Eğer programlama başarısız olduysa hiçbir şey yapma.
+                if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
+                    // Son gelen veriyi oku                      
+                  #ifdef OUTPUT_READABLE_YAWPITCHROLL
+                    // EULER hesaplamalarına göre dereceleri hesapla
+                    mpu.dmpGetQuaternion(&q, fifoBuffer);
+                    mpu.dmpGetGravity(&gravity, &q);
+                    mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+                    yawAngle = ypr[0] * 360 / M_PI; // Yaw açısını derece cinsinden al              
+                    motor1.setSpeed(speedDifference);
+                    motor1.run(FORWARD);
+                    motor2.setSpeed(speedDifference);
+                    motor2.run(BACKWARD);
+                    motor3.setSpeed(speedDifference);
+                    motor3.run(FORWARD);
+                    motor4.setSpeed(speedDifference);
+                    motor4.run(BACKWARD);
+                    Serial.println("******************** Sag IR 1 degerinde ********************");
+
+                    Serial.print("Yaw Deger = " );
+                    Serial.println(yawDeger);
+                    Serial.print("IMU\t");
+                    Serial.println(yawAngle);
+                  
+                  #endif
+                }
+            }             
+            rightIr = false;                           
+          }else if(leftIr){
+              while(yawDeger <= yawAngle){
+
+                if (!dmpReady) return;  // Eğer programlama başarısız olduysa hiçbir şey yapma.
+                if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
+                    // Son gelen veriyi oku                      
+                  #ifdef OUTPUT_READABLE_YAWPITCHROLL
+                    // EULER hesaplamalarına göre dereceleri hesapla
+                    mpu.dmpGetQuaternion(&q, fifoBuffer);
+                    mpu.dmpGetGravity(&gravity, &q);
+                    mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+                    yawAngle = ypr[0] * 360 / M_PI; // Yaw açısını derece cinsinden al 
+
+                    motor1.setSpeed(speedDifference);
+                    motor1.run(BACKWARD);
+                    motor2.setSpeed(speedDifference);
+                    motor2.run(FORWARD);
+                    motor3.setSpeed(speedDifference);
+                    motor3.run(BACKWARD);
+                    motor4.setSpeed(speedDifference);
+                    motor4.run(FORWARD);
+                    
+                    Serial.println("******************** Sol IR 1 degerinde ********************");
+                    Serial.print("Yaw Deger = " );
+                    Serial.println(yawDeger);
+                    Serial.print("IMU\t");
+                    Serial.println(yawAngle);
+                  #endif
+
+                }
+              } 
+             leftIr=false;
+
+        } 
       }
-      else if(position > 1000){
-        motor1.setSpeed(leftMotorSpeed);
-        motor1.run(FORWARD);
-        motor2.setSpeed(rightMotorSpeed);
-        motor2.run(BACKWARD);
-        motor3.setSpeed(leftMotorSpeed);
-        motor3.run(FORWARD);
-        motor4.setSpeed(rightMotorSpeed);
-        motor4.run(BACKWARD);
-      }
-    }
-    else if(position <= 4000){
-      motor1.setSpeed(leftMotorSpeed);
-      motor1.run(FORWARD);
-      motor2.setSpeed(rightMotorSpeed);
-      motor2.run(FORWARD);
-      motor3.setSpeed(leftMotorSpeed);
-      motor3.run(FORWARD);
-      motor4.setSpeed(rightMotorSpeed);
-      motor4.run(FORWARD);
-    }
-    else if(position <= 5100){
-      if(position > 4500){
-        motor1.setSpeed(leftMotorSpeed);
-        motor1.run(BACKWARD);
-        motor2.setSpeed(rightMotorSpeed);
-        motor2.run(FORWARD);
-        motor3.setSpeed(leftMotorSpeed);
-        motor3.run(BACKWARD);
-        motor4.setSpeed(rightMotorSpeed);
-        motor4.run(FORWARD);
-      }
-      else if(position > 4000){
-        motor1.setSpeed(leftMotorSpeed - (leftMotorSpeed * 0.2));
-        motor1.run(FORWARD);
-        motor2.setSpeed(rightMotorSpeed);
-        motor2.run(FORWARD);
-        motor3.setSpeed(leftMotorSpeed - (leftMotorSpeed * 0.2));
-        motor3.run(FORWARD);
-        motor4.setSpeed(rightMotorSpeed);
-        motor4.run(FORWARD);
-      }
-    }
+    #endif  
   
 
-   if(leftFrontIRValue == 1 && rightFrontIRValue== 0){
-      /*
-      motor1.setSpeed(leftMotorSpeed);
-      motor1.run(BACKWARD);
-      motor2.setSpeed(rightMotorSpeed);
-      motor2.run(FORWARD);
-      motor3.setSpeed(leftMotorSpeed);
-      motor3.run(BACKWARD);
-      motor4.setSpeed(rightMotorSpeed);
-      motor4.run(FORWARD);
-      */
-      Serial.println("SOLA 90 DÖNÜYOR");
-    }
-    if(rightFrontIRValue== 1 && leftFrontIRValue == 0 ){
-      /*
-      motor1.setSpeed(leftMotorSpeed);
-      motor1.run(FORWARD);
-      motor2.setSpeed(rightMotorSpeed);
-      motor2.run(BACKWARD);
-      motor3.setSpeed(leftMotorSpeed);
-      motor3.run(FORWARD);
-      motor4.setSpeed(rightMotorSpeed);
-      motor4.run(BACKWARD);
-      */
-      Serial.println("SAĞA 90 DÖNÜYOR");
+    if((millis() - timer) > sampleTime){
+        AGV_Telemetry_UART_Send();
+        timer = millis();
     }
   }
 
 
   void hizAyari(){
-    if (Serial1.available() > 0) {
-      String value = Serial1.readString();
-      Serial.println("Value =  " + value);
-      if(value == "start") {
-        rightMotorSpeed =  120;
-        leftMotorSpeed =  120;
-      }
-      if(value == "stop" ){
-        stopMotors();
-      }
-      if(value == "1" ){
-        rightMotorSpeed =  80;
-        leftMotorSpeed =  80;
-      }
-      if(value == "2" ){
-        rightMotorSpeed =  100;
-        leftMotorSpeed =  100;
-      }
-      if(value == "3" ){
-        rightMotorSpeed =  120;
-        leftMotorSpeed =  120;
-      }
+    bekle();
+    delay(200);
 
-      //Serial.println("right: " + String(rightMotorSpeed));
-      //Serial.println("left: " + String(leftMotorSpeed));
+    if(value == "4") {
+      rightMotorSpeed =  120;
+      leftMotorSpeed =  120;
+      speedDifference = 70;
+    }
+    if(value == "0" ){
+      bekle();
+    }
+    if(value == "1" ){
+      rightMotorSpeed =  120;
+      leftMotorSpeed =  120;
+      speedDifference = 70;
+    }
+    if(value == "2" ){
+      rightMotorSpeed =  150;
+      leftMotorSpeed =  150;
+      speedDifference = 100;
+    }
+    if(value == "3" ){
+       rightMotorSpeed =  180;
+      leftMotorSpeed =  180;
+      speedDifference= 130;
     }
   }
+
 
   void qtr_calibrate() {
     Serial.println("QTR-8RC Kalibrasyon Başladı.");
@@ -205,7 +284,7 @@
   }
 
   // Motorları durdurma fonksiyonu
-  void stopMotors() {
+  void bekle() {
     motor1.setSpeed(0);
     motor1.run(RELEASE);
     motor2.setSpeed(0);
@@ -216,9 +295,48 @@
     motor4.run(RELEASE);
   }
 
+  void UART_Control(){
+    //Serial Buffer = "ileri", Serial Buffer Size = 5, Serial.available() return -> 5.
+    while(Serial1.available() > 0){
+      char ch = Serial1.read();  //İlk okumada 'i', 'l', ..., her read() metodu çağrıldıktan sonra ilgili veri buffer'dan silinir ve buffer size 1 azaltılır.
+      if(ch != '\n')
+        UART_DATA += ch;  //"i", "il", "ile", "iler", "ileri"
+      else{
+        UART_COMPLETE = true;
+        Serial.println("Gelen Veri: " + UART_DATA);
+        break;
+      }
+    }
+
+    if(UART_COMPLETE == true){
+      
+      if(UART_DATA[0] == 'd'){
+        value = "0";
+      }
+      else if(UART_DATA[0] == 'x'){
+        value = "1";
+      }
+      else if(UART_DATA[0] == 'y'){
+        value = "2";
+      }
+      else if(UART_DATA[0] == 'z'){
+        value = "3";
+      }
+      else if(UART_DATA[0] == 'b'){
+        value = "4";
+      }
+      else{
+        Serial.println("Gecersiz Komut");
+      }
+
+      UART_COMPLETE = false;
+      UART_DATA = "";
+    }
+  }
+
   void AGV_Telemetry_UART_Send(){
     String msg = "";
-    msg += String(position) + "," + String(leftMotorSpeed) + "," + String(rightMotorSpeed) + "," + String(rightFrontIRValue) + "," + String(leftFrontIRValue) + ",";
+    msg += String(position) + "," + String(leftMotorSpeed) + "," + String(rightMotorSpeed) + "," + String(rightFrontIRSensorPin) + String(leftFrontIRSensorPin) + ","  ;
 
     for(int i = 0; i < 8; i++){
       if(sensorValues[i] > 700){
@@ -229,6 +347,7 @@
       }
     }
     msg += ",";
+    
     Serial1.println(msg);
     Serial.println(msg);
   }
